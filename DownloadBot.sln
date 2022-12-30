@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32929.385
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DownloadBot", "DownloadBot.csproj", "{C97908F8-D616-486F-B8E9-96F1FFAC9D10}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C97908F8-D616-486F-B8E9-96F1FFAC9D10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C97908F8-D616-486F-B8E9-96F1FFAC9D10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C97908F8-D616-486F-B8E9-96F1FFAC9D10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C97908F8-D616-486F-B8E9-96F1FFAC9D10}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {056E7A69-E879-4CBA-A706-B93FC5961818}
+	EndGlobalSection
+EndGlobal
