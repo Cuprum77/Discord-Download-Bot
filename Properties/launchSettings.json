@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "DownloadBot": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
