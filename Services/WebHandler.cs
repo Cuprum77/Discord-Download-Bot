@@ -1,8 +1,10 @@
-﻿using System;
+﻿using Discord;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using YoutubeExplode.Videos;
 
@@ -10,13 +12,12 @@ namespace DownloadBot.Services
 {
     public class WebHandler
     {
-        public bool isURI(string msg)
+        public bool isURI(string url)
         {
             // check if string is a URL
-            return Uri.TryCreate(msg, UriKind.Absolute, out Uri uriResult)
+            return Uri.TryCreate(url, UriKind.Absolute, out Uri uriResult)
                 && (uriResult.Scheme == Uri.UriSchemeHttps);
         }
-<<<<<<< HEAD
 
         public bool isYoutube(string url)
             => Regex.Match(url, @"(https?:\/\/|)(www\.|)?(youtube.com/(shorts/|watch\?v?)|youtu.be/)").Success;
@@ -71,7 +72,5 @@ namespace DownloadBot.Services
 
             return url;
         }
-=======
->>>>>>> parent of d63f4aa (grand reddit update)
     }
 }

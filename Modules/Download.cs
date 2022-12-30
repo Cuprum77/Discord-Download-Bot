@@ -23,7 +23,6 @@ namespace DownloadBot.Modules
         }
 
         [SlashCommand("ytd", "Download a youtube video", runMode: RunMode.Async)]
-<<<<<<< HEAD
         public async Task YoutubeDownloadAsync(string? url = null, MediaType type = MediaType.Video, YesNo statistics = YesNo.Yes)
         {
             var watch = new System.Diagnostics.Stopwatch();
@@ -33,23 +32,42 @@ namespace DownloadBot.Modules
 
             // attempt to find the url if its not present
             if (string.IsNullOrEmpty(url))
-=======
-        public async Task YoutubeDownloadAsync(string url, MediaType type = MediaType.Video)
-        {
-            // capture the time of when the command was issued
-            var time = DateTime.UtcNow.ToString();
-
-            // make sure the user provided an actual video URL using regex, luckily youtube only supports HTTPS
-            if (!Regex.Match(url, @"(https?:\/\/|)(www\.|)?(youtube.com/(shorts/|watch\?v?)|youtu.be/)").Success)
->>>>>>> parent of d63f4aa (grand reddit update)
             {
-                // try and fix the URL in case the user only provided the video id
-                url = "https://youtu.be/" + url;
+                // get the last n messages in the channel
+                var messages = await Context.Channel.GetMessagesAsync(Bot.SearchLimit).FlattenAsync();
 
-                // if it still fails, throw an error
+                // loop through each message and check if its a real URI
+                foreach (var message in messages)
+                {
+                    // skip empty messages
+                    if (string.IsNullOrEmpty(message.Content))
+                        continue;
+
+                    // if theres an embed, it contain a youtube url
+                    if (message.Embeds.Count > 0)
+                    {
+                        // check the embeds if it contains any youtube links
+                        url = webhandler.CheckEmbeds(message);
+                        // if there was a link, break the loop
+                        if (!string.IsNullOrEmpty(url))
+                            break;
+                    }
+
+                    // check if the message itself contains a url thats not embedded
+                    url = message.Content;
+                    if (webhandler.isURI(url))
+                    {
+                        // check if the url is a youtube url
+                        if (webhandler.isYoutube(url))
+                            break;
+                    }
+                }
+            }
+            else
+            {
+                // make sure the user provided an actual video URL using regex, luckily youtube only supports HTTPS
                 if (!Regex.Match(url, @"(https?:\/\/|)(www\.|)?(youtube.com/(shorts/|watch\?v?)|youtu.be/)").Success)
                 {
-<<<<<<< HEAD
                     // try and fix the URL in case the user only provided the video id
                     url = "https://youtu.be/" + url;
 
@@ -69,22 +87,8 @@ namespace DownloadBot.Modules
                 if (!webhandler.isURI(url) || !webhandler.isYoutube(url))
                 {
                     await FollowupAsync("Not a valid Youtube URL", ephemeral: true);
-=======
-                    await RespondAsync("Not a valid Youtube URL.", ephemeral: true);
->>>>>>> parent of d63f4aa (grand reddit update)
                     return;
                 }
-            }
-
-            // check if user forgot to add https:// prefix
-            if (!Regex.Match(url, @"https?:\/\/").Success)
-                url = "https://" + url;
-
-            // if we somehow messed up and its no longer an URL, fail
-            if (!webhandler.isURI(url))
-            {
-                await RespondAsync("Not a valid Youtube URL.", ephemeral: true);
-                return;
             }
 
             // create a new youtube object
@@ -92,7 +96,7 @@ namespace DownloadBot.Modules
             // get the video
             var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url);
             var video = await youtube.Videos.GetAsync(url);
-            
+
             // get video metadata
             var title = video.Title;
 
@@ -109,7 +113,7 @@ namespace DownloadBot.Modules
                     break;
                 case MediaType.AudioOnly:
                     streamInfo = streamManifest.GetAudioOnlyStreams();
-                    extension = ".mp3";
+                    extension = ".webm";
                     break;
                 case MediaType.VideoOnly:
                     streamInfo = streamManifest.GetVideoOnlyStreams();

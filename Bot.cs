@@ -17,6 +17,7 @@ namespace DownloadBot
     public class Bot
     {
         public static int MaxFileSize = 8388608;
+        public static int SearchLimit;
 
         private readonly IServiceProvider services;
         private static string token = "";
@@ -102,6 +103,17 @@ namespace DownloadBot
 
                     // retrieve the rest of the data if it exists
                     status = settings["status"] ?? "";
+
+                    // attempt to parse the settings as an integer
+                    string searchLimit = settings["search-limit"] ?? "";
+
+                    if (!string.IsNullOrEmpty(searchLimit))
+                    {
+                        if (int.TryParse(searchLimit, out int limit))
+                            SearchLimit = limit;
+                        else
+                            throw new ConfigurationErrorsException("The \"search-limit\"-field must be an integer!");
+                    }
                 }
             }
             catch (ConfigurationErrorsException e)
