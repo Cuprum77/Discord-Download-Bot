@@ -10,6 +10,7 @@ using YoutubeExplode.Videos.Streams;
 using YoutubeExplode;
 using DownloadBot.Services;
 using DownloadBot.Enums;
+using YoutubeExplode.Videos;
 
 namespace DownloadBot.Modules
 {
@@ -23,79 +24,61 @@ namespace DownloadBot.Modules
         }
 
         [SlashCommand("ytd", "Download a youtube video", runMode: RunMode.Async)]
-        public async Task YoutubeDownloadAsync(string? url = null, MediaType type = MediaType.Video, YesNo statistics = YesNo.Yes)
+        public async Task YoutubeDownloadAsync(string url, MediaType type = MediaType.Video, YesNo statistics = YesNo.Yes)
         {
             var watch = new System.Diagnostics.Stopwatch();
             watch.Start();
             // defer the interraction to buy us some time
             await DeferAsync();
 
-            // attempt to find the url if its not present
+            // originally i wanted it to be able to search through previous messages, but this is rather buggy and tedious for minimal gain
+            // check if the string isnt empty, as a sanity check
             if (string.IsNullOrEmpty(url))
             {
-                // get the last n messages in the channel
-                var messages = await Context.Channel.GetMessagesAsync(Bot.SearchLimit).FlattenAsync();
-
-                // loop through each message and check if its a real URI
-                foreach (var message in messages)
-                {
-                    // skip empty messages
-                    if (string.IsNullOrEmpty(message.Content))
-                        continue;
-
-                    // if theres an embed, it contain a youtube url
-                    if (message.Embeds.Count > 0)
-                    {
-                        // check the embeds if it contains any youtube links
-                        url = webhandler.CheckEmbeds(message);
-                        // if there was a link, break the loop
-                        if (!string.IsNullOrEmpty(url))
-                            break;
-                    }
-
-                    // check if the message itself contains a url thats not embedded
-                    url = message.Content;
-                    if (webhandler.isURI(url))
-                    {
-                        // check if the url is a youtube url
-                        if (webhandler.isYoutube(url))
-                            break;
-                    }
-                }
+                await FollowupAsync("Not a valid Youtube URL");
+                return;
             }
-            else
+
+            // make sure the user provided an actual video URL using regex, luckily youtube only supports HTTPS
+            if (!Regex.Match(url, @"(https?:\/\/|)(www\.|)?(youtube.com/(shorts/|watch\?v?)|youtu.be/)").Success)
             {
-                // make sure the user provided an actual video URL using regex, luckily youtube only supports HTTPS
-                if (!Regex.Match(url, @"(https?:\/\/|)(www\.|)?(youtube.com/(shorts/|watch\?v?)|youtu.be/)").Success)
+                // try and fix the URL in case the user only provided the video id
+                url = "https://youtu.be/" + url;
+
+                // if it still fails, throw an error
+                if (!webhandler.isYoutube(url))
                 {
-                    // try and fix the URL in case the user only provided the video id
-                    url = "https://youtu.be/" + url;
-
-                    // if it still fails, throw an error
-                    if (!webhandler.isYoutube(url))
-                    {
-                        await FollowupAsync("Not a valid Youtube URL", ephemeral: true);
-                        return;
-                    }
-                }
-
-                // check if user forgot to add https:// prefix
-                if (!Regex.Match(url, @"https?:\/\/").Success)
-                    url = "https://" + url;
-
-                // if we somehow messed up and its no longer an URL, fail
-                if (!webhandler.isURI(url) || !webhandler.isYoutube(url))
-                {
-                    await FollowupAsync("Not a valid Youtube URL", ephemeral: true);
+                    await FollowupAsync("Not a valid Youtube URL");
                     return;
                 }
+            }
+
+            // check if user forgot to add https:// prefix
+            if (!Regex.Match(url, @"https?:\/\/").Success)
+                url = "https://" + url;
+
+            // if we somehow messed up and its no longer an URL, fail
+            if (!webhandler.isURI(url) || !webhandler.isYoutube(url))
+            {
+                await FollowupAsync("Not a valid Youtube URL");
+                return;
             }
 
             // create a new youtube object
             var youtube = new YoutubeClient();
             // get the video
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url);
-            var video = await youtube.Videos.GetAsync(url);
+            StreamManifest? streamManifest;
+            Video? video;
+            try
+            {
+                streamManifest = await youtube.Videos.Streams.GetManifestAsync(url);
+                video = await youtube.Videos.GetAsync(url);
+            }
+            catch(Exception e)
+            {
+                await FollowupAsync("Failed to download video");
+                return;
+            }
 
             // get video metadata
             var title = video.Title;
@@ -144,19 +127,25 @@ namespace DownloadBot.Modules
             }
 
             // add the extension onto the title
+            title = Regex.Replace(title, "[^0-9a-zA-Z]+", "");
             title += extension;
 
             // get the stream
             var stream = await youtube.Videos.Streams.GetAsync(videoInfo);
 
             // create an embed for it
+            var stats = new Statistics();
+            var views = stats.YoutubeTruncate(video.Engagement.ViewCount);
+            var likes = stats.YoutubeTruncate(video.Engagement.LikeCount);
+
             var fieldEmbed = new EmbedFieldBuilder()
             {
                 Name = "Statistics",
                 Value = $"""
-                :eyes: Views `{video.Engagement.ViewCount}`
-                :thumbsup: Likes  `{video.Engagement.LikeCount}`
+                :smiley: Creator [{video.Author.ChannelTitle}]({video.Author.ChannelUrl})
                 :date: Uploaded <t:{video.UploadDate.ToUnixTimeSeconds()}:R>
+                :eyes: Views {views}
+                :thumbsup: Likes  {likes}
                 """
             };
 
@@ -184,7 +173,7 @@ namespace DownloadBot.Modules
 
 
         [SlashCommand("rtd", "Download a reddit video", runMode: RunMode.Async)]
-        public async Task RedditDownloadAsync(string url, MediaType type = MediaType.Video)
+        public async Task RedditDownloadAsync(string url, MediaType type = MediaType.Video, YesNo statistics = YesNo.Yes)
         {
             var watch = new System.Diagnostics.Stopwatch();
             watch.Start();
@@ -194,23 +183,40 @@ namespace DownloadBot.Modules
             // if we somehow messed up and its no longer an URL, fail
             if (!webhandler.isURI(url) || string.IsNullOrEmpty(url))
             {
-                await FollowupAsync("Not a valid Reddit URL", ephemeral: true);
+                await FollowupAsync("Not a valid Reddit URL");
                 return;
             }
 
             // create a new Reddit object
             var reddit = new Reddit(url);
-            // because reddit is a bit annoying, we wrap it in a try catch
-            try 
-            { 
-                reddit.GetVideoURL(); 
-            } catch (Exception ex)
+
+            try
             {
-                await FollowupAsync(ex.Message, ephemeral: true);
+                reddit.DownloadMetaData();
+                reddit.DownloadVideoData();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                await FollowupAsync("Failed to download video");
                 return;
             }
 
+            // if its marked as 18+, we need to take care not to post it in a non 18+ channel
+            if(Context.Channel is ITextChannel)
+            {
+                if (!(Context.Channel as ITextChannel).IsNsfw && reddit.Post.AgeRestricted != null)
+                {
+                    if ((bool)reddit.Post.AgeRestricted)
+                    {
+                        await FollowupAsync("You cant post adult content in a SFW channel!");
+                        return;
+                    }
+                }
+            }
+
             Stream? stream;
+            string title;
             string filename;
 
             // change format depending on selection
@@ -218,32 +224,82 @@ namespace DownloadBot.Modules
             {
                 case MediaType.Video:
                     stream = reddit.DownloadMuxxedVideo();
-                    filename = reddit.Title + ".webm";
+                    title = Regex.Replace(reddit.Post.Title, "[^0-9a-zA-Z]+", "");
+                    filename = title + "_" + reddit.Video.Resolution + "p" + ".webm";
                     break;
                 case MediaType.AudioOnly:
                     stream = reddit.DownloadAudioOnly();
-                    filename = reddit.Title + ".mp3"; 
+                    title = Regex.Replace(reddit.Post.Title, "[^0-9a-zA-Z]+", "");
+                    filename = title + ".mp3";
                     break;
                 case MediaType.VideoOnly:
                     stream = reddit.DownloadVideoOnly();
-                    filename = reddit.Title + ".webm"; 
+                    title = Regex.Replace(reddit.Post.Title, "[^0-9a-zA-Z]+", "");
+                    filename = title + "_" + reddit.Video.Resolution + "p" + ".webm";
                     break;
                 default:
-                    await FollowupAsync("Something went wrong", ephemeral: true);
+                    await FollowupAsync("Something went wrong");
                     return;
             }
 
             // if the stream is null, the video is missing
             if (stream == null)
             {
-                await FollowupAsync("Failed to download video", ephemeral: true);
+                await FollowupAsync("Failed to download video");
                 return;
             }
 
-            // send the stream as a response to the user
-            await FollowupWithFileAsync(stream, filename);
+            // create an embed for it
+            var stats = new Statistics();
+            var likes = stats.YoutubeTruncate((double)(reddit.Post.Upvotes ?? 0));
+            var coinsTotal = stats.YoutubeTruncate((double)(reddit.Awards.TotalCount()));
+            var coinsCost = stats.YoutubeTruncate((double)(reddit.Awards.TotalCost()));
+            var dayspremium = stats.YoutubeTruncate((double)(reddit.Awards.TotalDaysPremium()));
 
-            if(type == MediaType.Video)
+            // calculate the coins per dollar price
+            var price = 500 / 1.99;
+            // if we now divide the total coins by the coins per dollar, we should get the price in dollars
+            var coinCostDollars = Math.Round((double)reddit.Awards.TotalCost() / price, 2);
+
+            var postField = new EmbedFieldBuilder()
+            {
+                Name = "Post Statistics",
+                Value = $"""
+                :smiley: User [{reddit.User.Username}]({reddit.User.Url}/)
+                :date: Uploaded <t:{reddit.Post.CreatedAtUTC}:R>
+                :thumbsup: Upvotes {likes}
+                :military_medal: Awards {coinsTotal}
+                :coin: Award Cost {coinsCost}
+                :moneybag: Theoretical Cost* {coinCostDollars} $
+                :tickets: Days Premium Gained {dayspremium}
+
+                * Does not take into account free awards nor bundles
+                Note: Older posts may not download correctly!
+                """
+            };
+
+            var authorEmbed = new EmbedAuthorBuilder()
+            {
+                Name = reddit.Subreddit.Name,
+                Url = reddit.Subreddit.Url,
+                IconUrl = reddit.Subreddit.IconUrl
+            };
+
+            var embed = new EmbedBuilder()
+                 .WithAuthor(authorEmbed)
+                 .WithTitle(reddit.Post.Title)
+                 .WithUrl(url)
+                 .WithImageUrl(reddit.Image.Last().Url)
+                 .WithFooter(DateTime.UtcNow.ToString() + " UTC")
+                 .WithFields(postField)
+                 .Build();
+
+            // send the stream as a response to the user
+            Embed? actualEmbed = statistics == YesNo.No ? null : embed;
+            // send the stream as a response to the user
+            await FollowupWithFileAsync(stream, filename, embed: actualEmbed);
+
+            if (type == MediaType.Video)
                 try { File.Delete($"temp/{reddit.Filename}"); } catch { }
             watch.Stop();
             Console.WriteLine($"/rtd took me {watch.ElapsedMilliseconds} ms to run");

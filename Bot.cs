@@ -100,7 +100,7 @@ namespace DownloadBot
                     // throw an exception if we cant find the token
                     if (string.IsNullOrEmpty(token))
                         throw new ConfigurationErrorsException("The \"discord-token\"-field can't be empty!");
-
+                    
                     // retrieve the rest of the data if it exists
                     status = settings["status"] ?? "";
 

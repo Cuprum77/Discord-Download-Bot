@@ -57,20 +57,5 @@ namespace DownloadBot.Services
 
             return content;
         }
-
-        public string CheckEmbeds(IMessage message)
-        {
-            string url = "";
-
-            foreach (var embed in message.Embeds)
-            {
-                url = embed.Url;
-
-                if (isYoutube(url) || isReddit(url))
-                    break;
-            }
-
-            return url;
-        }
     }
 }
